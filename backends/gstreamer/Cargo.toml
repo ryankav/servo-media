@@ -21,6 +21,7 @@ gst-base = { workspace = true }
 gst-player = { workspace = true }
 gst-webrtc = { workspace = true }
 gst-sdp = { workspace = true }
+gst-mse = { workspace = true }
 gstreamer-sys = { workspace = true }
 ipc-channel = { workspace = true }
 log = "0.4"

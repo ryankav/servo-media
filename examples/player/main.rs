@@ -25,6 +25,12 @@ use std::path::Path;
 mod app;
 use app::*;
 
+
+#[cfg(not(target_os = "android"))]
+#[path = "mse_app.rs"]
+mod mse_app;
+use mse_app::*;
+
 #[cfg(target_os = "android")]
 fn main() {
     panic!("Unsupported");
@@ -60,6 +66,13 @@ fn main() {
                 .conflicts_with("no-video"),
         )
         .arg(
+            clap::Arg::with_name("mse")
+                .long("mse")
+                .display_order(4)
+                .help("Render video using the mse extension")
+                .conflicts_with("no-video"),
+        )
+        .arg(
             clap::Arg::with_name("file")
                 .required(true)
                 .value_name("FILE"),
@@ -72,10 +85,20 @@ fn main() {
         wr_stats: clap_matches.is_present("wr-stats"),
     };
 
+
+    if clap_matches.is_present("mse") {
+    let path = clap_matches.value_of("file").map(|s| Path::new(s)).unwrap();
+
+    match MseApp::new(path).and_then(mse_main_loop).and_then(mse_cleanup) {
+        Ok(r) => r,
+        Err(e) => eprintln!("Error! {}", e),
+    }
+    } else {
     let path = clap_matches.value_of("file").map(|s| Path::new(s)).unwrap();
 
     match App::new(opts, path).and_then(main_loop).and_then(cleanup) {
         Ok(r) => r,
         Err(e) => eprintln!("Error! {}", e),
+    }
     }
 }

@@ -22,6 +22,8 @@ webrender = { git = "https://github.com/servo/webrender", optional = true }
 webrender_api = { git = "https://github.com/servo/webrender", optional = true }
 websocket = { version = "0.22", optional = true }
 ipc-channel = { workspace = true, optional = true }
+gst-mse = { workspace = true }
+gst = { workspace = true }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 winit = { version = "0.19", optional = true }

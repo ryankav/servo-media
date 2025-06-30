@@ -14,6 +14,7 @@ path = "lib.rs"
 serde = "1.0.66"
 serde_derive = "1.0.66"
 ipc-channel = { workspace = true }
+gst-mse = {workspace = true }
 
 [dependencies.servo-media-streams]
 path = "../streams"

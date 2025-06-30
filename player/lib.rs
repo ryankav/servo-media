@@ -13,6 +13,7 @@ use ipc_channel::ipc::{self, IpcSender};
 use servo_media_traits::MediaInstance;
 use std::ops::Range;
 use streams::registry::MediaStreamId;
+use gst_mse::MediaSource;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum PlaybackState {
@@ -87,6 +88,9 @@ pub enum StreamType {
     Stream,
     /// The stream is seekable.
     Seekable,
+    // FIXME: This mse type probably shouldn't stay here
+    /// The stream is controlled by the application through media source extension api.
+    MSE,
 }
 
 pub trait Player: Send + MediaInstance {
@@ -117,4 +121,5 @@ pub trait Player: Send + MediaInstance {
     fn render_use_gl(&self) -> bool;
     fn set_audio_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError>;
     fn set_video_track(&self, stream_index: i32, enabled: bool) -> Result<(), PlayerError>;
+    fn attach_media_source_extension(&self, source: &MediaSource) -> Result<(), PlayerError>;
 }

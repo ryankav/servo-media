@@ -44,7 +44,7 @@ use std::thread;
 use std::vec::Vec;
 
 static BACKEND_BASE_TIME: Lazy<gst::ClockTime> =
-    Lazy::new(|| gst::SystemClock::obtain().time().unwrap());
+    Lazy::new(|| gst::SystemClock::obtain().time());
 
 static BACKEND_THREAD: OnceCell<bool> = OnceCell::new();
 

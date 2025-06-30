@@ -10,6 +10,7 @@ use gst;
 use gst::prelude::*;
 use gst_app;
 use gst_player;
+use gst_mse::{MseSrc, MediaSource};
 use gst_player::prelude::*;
 use ipc_channel::ipc::{channel, IpcReceiver, IpcSender};
 use servo_media_player::audio::AudioRenderer;
@@ -27,7 +28,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex, Once};
 use std::time;
-use std::u64;
 
 const MAX_BUFFER_SIZE: i32 = 500 * 1024 * 1024;
 
@@ -35,7 +35,7 @@ fn metadata_from_media_info(media_info: &gst_player::PlayerMediaInfo) -> Result<
     let dur = media_info.duration();
     let duration = if let Some(dur) = dur {
         let mut nanos = dur.nseconds();
-        nanos = nanos % 1_000_000_000;
+        nanos %= 1_000_000_000;
         let seconds = dur.seconds();
         Some(time::Duration::new(seconds, nanos as u32))
     } else {
@@ -108,6 +108,7 @@ impl AsRef<[f32]> for GStreamerAudioChunk {
 enum PlayerSource {
     Seekable(ServoSrc),
     Stream(ServoMediaStreamSrc),
+    Mse(MseSrc),
 }
 
 struct PlayerInner {
@@ -246,7 +247,7 @@ impl PlayerInner {
                 let mut buffering = gst::query::Buffering::new(gst::Format::Percent);
                 if pipeline.query(&mut buffering) {
                     let ranges = buffering.ranges();
-                    for (start, end) in &ranges {
+                    for (start, end) in ranges {
                         let start = (if let gst::GenericFormattedValue::Percent(start) = start {
                             start.unwrap()
                         } else {
@@ -289,6 +290,16 @@ impl PlayerInner {
                     source.set_stream(&mut stream, only_stream);
                     return Ok(());
                 }
+            }
+        }
+        Err(PlayerError::SetStreamFailed)
+    }
+
+    fn attach_media_source_extension(&mut self, source: &MediaSource) -> Result<(), PlayerError> {
+        debug_assert!(self.stream_type == StreamType::MSE);
+        if let Some(ref src) = self.source {
+            if let PlayerSource::Mse(src) = src {
+                source.attach(src);
             }
         }
         Err(PlayerError::SetStreamFailed)
@@ -515,7 +526,8 @@ impl GStreamerPlayer {
                 register_servo_src()
                     .map_err(|error| PlayerError::Backend(format!("servosrc registration error: {error:?}")))?;
                 "servosrc://".to_value()
-            }
+            },
+            StreamType::MSE => "mse://".to_value(),
         };
         player.set_property("uri", &uri);
 
@@ -741,7 +753,17 @@ impl GStreamerPlayer {
                             notify!(sender_clone, Ok(()));
                         });
                         PlayerSource::Stream(media_stream_src)
-                    }
+                    },
+                    StreamType::MSE => {
+                        let mse_src = source
+                            .dynamic_cast::<MseSrc>()
+                            .expect("Source element is expected to be a GstMseSrc!");
+                        let sender_clone = sender.clone();
+                        is_ready_clone.call_once(|| {
+                            notify!(sender_clone, Ok(()));
+                        });
+                        PlayerSource::Mse(mse_src)
+                    },
                 };
 
                 inner.set_src(source);
@@ -840,6 +862,13 @@ impl Player for GStreamerPlayer {
         let inner = self.inner.borrow();
         let mut inner = inner.as_ref().unwrap().lock().unwrap();
         inner.set_video_track(stream_index, enabled)
+    }
+
+    fn attach_media_source_extension(&self, source: &gst_mse::MediaSource) -> Result<(), PlayerError> {
+        self.setup()?;
+        let inner = self.inner.borrow();
+        let mut inner = inner.as_ref().unwrap().lock().unwrap();
+        inner.attach_media_source_extension(source)
     }
 }
 
